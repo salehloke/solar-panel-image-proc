@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  train:
+    build: .
+    container_name: solar-train
+    volumes:
+      - ./:/app
+      - ./data:/app/data  # persist dataset outside container layers
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: ["src/train.py", "--data_dir", "data/processed", "--epochs", "10"]
+    # Uncomment the following lines if you have an NVIDIA GPU and the nvidia-container-runtime installed
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]

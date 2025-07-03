@@ -1,0 +1,21 @@
+# data
+/data/
+!/data/.gitkeep
+
+# virtual envs
+.venv/
+
+# python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# logs & experiments
+runs/
+*.log
+
+# mac
+.DS_Store
