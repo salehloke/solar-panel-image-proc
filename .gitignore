@@ -19,3 +19,4 @@ runs/
 
 # mac
 .DS_Store
+models/*.pt
