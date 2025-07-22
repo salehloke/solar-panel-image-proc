@@ -71,20 +71,32 @@ export default function ImageUpload({ onPrediction, onError, onLoading }: ImageU
             const formData = new FormData();
             formData.append('file', selectedImage);
 
-            const response = await fetch('http://localhost:8000/prediction/', {
+            // Add timeout to prevent infinite loading
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+            const response = await fetch('http://localhost:8000/predict', {
                 method: 'POST',
                 body: formData,
+                signal: controller.signal,
             });
 
+            clearTimeout(timeoutId);
+
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
 
             const result = await response.json();
             onPrediction(result);
         } catch (error) {
             console.error('Error uploading image:', error);
-            onError('Failed to analyze image. Please try again.');
+            if (error.name === 'AbortError') {
+                onError('Request timed out. The model might still be loading. Please try again in a few minutes.');
+            } else {
+                onError(`Failed to analyze image: ${error.message}`);
+            }
         } finally {
             onLoading(false);
         }
@@ -104,8 +116,8 @@ export default function ImageUpload({ onPrediction, onError, onLoading }: ImageU
             {/* File Upload Area */}
             <div
                 className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${previewUrl
-                        ? 'border-green-300 bg-green-50'
-                        : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+                    ? 'border-green-300 bg-green-50'
+                    : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
                     }`}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}

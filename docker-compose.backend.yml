@@ -1,0 +1,114 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: solarai_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: solarai
+      POSTGRES_USER: solarai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-solarai123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - solarai_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solarai -d solarai"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # pgAdmin (Optional - for database management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: solarai_pgadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@solarai.com
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - solarai_network
+
+  # FastAPI Backend
+  api-gateway:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: solarai_api_gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://solarai:solarai123@postgres:5432/solarai
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-solarai123}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRES_IN=30
+      - MODEL_LOADING_MODE=${MODEL_LOADING_MODE:-volume}
+      - MODEL_NAME=${MODEL_NAME:-resnet18_solar_panel.pt}
+      - MODEL_PATH=${MODEL_PATH:-/app/models}
+      - MODEL_SAVE_PATH=${MODEL_SAVE_PATH:-/app/models/resnet18_solar_panel.pt}
+      - MODEL_DOWNLOAD_URL=${MODEL_DOWNLOAD_URL:-https://download.pytorch.org/models/resnet18-5c106cde.pth}
+      - MODEL_CACHE_DIR=${MODEL_CACHE_DIR:-/home/appuser/.cache/torch/hub}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - model_storage:/app/models
+      - log_storage:/app/logs
+      - torch_cache:/home/appuser/.cache/torch
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - solarai_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7.2-alpine
+    container_name: solarai_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - solarai_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  redis_data:
+    driver: local
+  torch_cache:
+    driver: local
+  model_storage:
+    driver: local
+  log_storage:
+    driver: local
+
+networks:
+  solarai_network:
+    driver: bridge
