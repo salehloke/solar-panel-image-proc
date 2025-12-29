@@ -1,19 +1,18 @@
 # Quickstart Guide: Solar Panel Dirt Detection System
 
-This guide will help you quickly set up, train, and run the solar panel dirt detection system using PyTorch and FastAPI.
+This guide will help you quickly set up, train, and run the solar panel dirt detection system. The project supports two modes: **Edge (Lightweight)** and **Cloud (Deep Learning)**.
 
 ---
 
 ## 1. Installation
 
 1. **Clone the repository:**
-
    ```bash
    git clone <repository-url>
    cd solar-image-processing
    ```
 
-2. **Install dependencies:**
+2. **Install local dependencies (optional, for development):**
    ```bash
    pip3 install -r requirements.txt
    ```
@@ -22,85 +21,72 @@ This guide will help you quickly set up, train, and run the solar panel dirt det
 
 ## 2. Prepare Your Data
 
-Organize your images as follows:
-
+Organize your images in the `data/` directory:
 ```
 data/
 ├── train/
-│   ├── clean/   # Clean solar panel images
-│   └── dirty/   # Dirty solar panel images
+│   ├── clean/           # Clean solar panel images
+│   ├── dust/            # Edge: Dust images
+│   ├── bird_droppings/  # Edge: Bird droppings
+│   └── moss/            # Edge: Moss images
 └── test/
-    ├── clean/   # (Optional) Test clean images
-    └── dirty/   # (Optional) Test dirty images
+    ├── clean/
+    └── ...
 ```
 
 ---
 
-## 3. Train the Model
+## 🚀 3. Run the System (Docker Compose)
 
-Run the complete training pipeline (from the project root):
+The easiest way to run the system is using Docker Compose.
 
+### Option A: Edge-Optimized Stack (Recommended for Pi/Verification)
+Uses SVM + HOG/GLCM features. Extremely lightweight and supports multi-class classification.
+```bash
+docker-compose -f docker-compose.edge.yml up --build
+```
+- **Dashboard**: http://localhost:3000
+- **Edge API**: http://localhost:8000/docs
+
+### Option B: Cloud/Deep Learning Stack
+Uses ResNet18 (PyTorch) + PostgreSQL + Redis.
+```bash
+docker-compose -f docker-compose.backend.yml up --build
+```
+- **API Gateway**: http://localhost:8000/docs
+- **pgAdmin**: http://localhost:8081
+
+---
+
+## 🛠️ 4. Manual Training (Edge)
+
+To train the lightweight edge models locally:
+```bash
+# 1. Install edge requirements
+pip install -r backend_edge/requirements-pi.txt
+
+# 2. Run training
+python3 src_edge/train.py --data_dir data/train --output_dir backend_edge/app/models
+
+# 3. Run evaluation
+python3 src_edge/evaluate.py --data_dir data/test --model_dir backend_edge/app/models
+```
+
+---
+
+## ☁️ 5. Manual Training (Deep Learning)
+
+Run the complete DL training pipeline:
 ```bash
 python3 scripts/train_pipeline.py --epochs 10 --use_class_weights
 ```
 
-- This will split your data, train the model, and save the best model in the `models/` directory.
+---
+
+## 🧪 6. Verification
+
+Refer to `VERIFY.md` for a comprehensive multi-machine verification checklist.
 
 ---
 
-## 4. Run the FastAPI Backend
-
-Start the API server:
-
-```bash
-python3 backend/run.py
-```
-
-- The API will be available at: [http://localhost:8000](http://localhost:8000)
-- Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
-
----
-
-## 5. Make Predictions
-
-Test the API with an image using `curl`:
-
-```bash
-curl -X POST "http://localhost:8000/prediction/" \
-     -H "accept: application/json" \
-     -H "Content-Type: multipart/form-data" \
-     -F "file=@path/to/your/solar_panel_image.jpg"
-```
-
-You will receive a response like:
-
-```json
-{
-  "filename": "solar_panel.jpg",
-  "prediction": "dirty",
-  "confidence": 0.89,
-  "status": "success"
-}
-```
-
----
-
-## 6. (Optional) Run with Docker
-
-To build and run everything in Docker:
-
-```bash
-docker-compose up --build
-```
-
----
-
-## Troubleshooting
-
-- If you see missing package errors, run: `pip3 install -r requirements.txt`
-- If the API cannot find the model, ensure you have trained the model and it is saved in the `models/` directory.
-- For more details, see the main `README.md`.
-
----
-
-**You're ready to detect solar panel dirt with deep learning!**
+**Happy Solar Panel Monitoring! 🌞**

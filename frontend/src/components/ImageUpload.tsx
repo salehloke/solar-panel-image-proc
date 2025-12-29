@@ -2,8 +2,17 @@
 
 import { useState, useRef } from 'react';
 
+interface PredictionData {
+    filename?: string;
+    prediction: string;
+    class_name?: string;
+    confidence: number;
+    status?: string;
+    efficiency_loss?: number;
+}
+
 interface ImageUploadProps {
-    onPrediction: (result: any) => void;
+    onPrediction: (result: PredictionData) => void;
     onError: (error: string) => void;
     onLoading: (loading: boolean) => void;
 }
@@ -92,10 +101,10 @@ export default function ImageUpload({ onPrediction, onError, onLoading }: ImageU
             onPrediction(result);
         } catch (error) {
             console.error('Error uploading image:', error);
-            if (error.name === 'AbortError') {
+            if (error instanceof Error && error.name === 'AbortError') {
                 onError('Request timed out. The model might still be loading. Please try again in a few minutes.');
             } else {
-                onError(`Failed to analyze image: ${error.message}`);
+                onError(`Failed to analyze image: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
         } finally {
             onLoading(false);

@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  # Lightweight Edge Backend (SVM/HOG/GLCM)
+  edge-api:
+    build:
+      context: ./backend_edge
+      dockerfile: Dockerfile
+    container_name: solar_edge_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=app/models/solar_svm_model.pkl
+      - DATABASE_URL=sqlite+aiosqlite:///./solar_edge.db
+    volumes:
+      - ./backend_edge:/app
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Dashboard Frontend
+  dashboard:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: solar_dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      edge-api:
+        condition: service_healthy
+
+volumes:
+  edge_data:
+    driver: local

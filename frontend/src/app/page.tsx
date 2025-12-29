@@ -4,12 +4,21 @@ import { useState } from 'react';
 import ImageUpload from '@/components/ImageUpload';
 import PredictionResult from '@/components/PredictionResult';
 
+interface PredictionData {
+  filename?: string;
+  prediction?: string;
+  class_name?: string;
+  confidence: number;
+  status?: string;
+  efficiency_loss?: number;
+}
+
 export default function Home() {
-  const [prediction, setPrediction] = useState<any>(null);
+  const [prediction, setPrediction] = useState<PredictionData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handlePrediction = async (result: any) => {
+  const handlePrediction = async (result: PredictionData) => {
     setPrediction(result);
     setError(null);
   };
@@ -32,7 +41,7 @@ export default function Home() {
             Solar Panel Dirt Detection
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Upload an image of a solar panel to detect if it's clean or dirty using AI
+            Upload an image of a solar panel to detect if it&apos;s clean or dirty using AI
           </p>
         </div>
 
@@ -48,6 +57,28 @@ export default function Home() {
               onError={handleError}
               onLoading={handleLoading}
             />
+            
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <h3 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wider">Edge Controls</h3>
+              <button
+                onClick={async () => {
+                  handleLoading(true);
+                  try {
+                    const res = await fetch('http://localhost:8000/capture', { method: 'POST' });
+                    if (res.ok) handlePrediction(await res.json());
+                    else handleError('Failed to trigger remote camera');
+                  } catch {
+                    handleError('Cannot connect to edge node');
+                  } finally {
+                    handleLoading(false);
+                  }
+                }}
+                className="w-full flex items-center justify-center space-x-2 bg-purple-50 text-purple-700 px-4 py-3 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors"
+              >
+                <span>📸</span>
+                <span className="font-semibold">Remote Pi Capture</span>
+              </button>
+            </div>
           </div>
 
           {/* Results Section */}

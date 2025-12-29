@@ -4,50 +4,51 @@ A comprehensive deep learning system for detecting dirt accumulation on solar pa
 
 ## 🌟 Features
 
-- **Deep Learning Model**: ResNet18-based classifier for solar panel cleanliness detection
-- **Production API**: FastAPI backend for real-time predictions
-- **Comprehensive Training**: Advanced training pipeline with logging, early stopping, and evaluation
-- **Data Augmentation**: Robust data augmentation for better model generalization
-- **Class Imbalance Handling**: Support for imbalanced datasets with class weights
-- **Docker Support**: Containerized deployment
-- **Detailed Evaluation**: Comprehensive metrics and visualization
-- **Easy-to-Use Pipeline**: One-command training and evaluation
+- **Hybrid AI Architecture**: Supports both Deep Learning (ResNet18/PyTorch) and Lightweight Edge (SVM/HOG/GLCM).
+- **Multi-Class Detection**: Detects Clean, Dust, Bird Droppings, and Moss.
+- **Production API**: FastAPI backend with real-time predictions and local SQLite analytics for edge.
+- **Comprehensive Training**: Advanced pipelines for both CNN and classical ML models.
+- **Docker First**: Full containerization for dashboard, API, and training modules.
+- **Interactive Dashboard**: Next.js 15 dashboard with real-time status and historical trends.
 
 ## 📊 Project Overview
 
 This system helps solar panel operators:
 
-- **Detect dirt accumulation** on solar panels from images
-- **Schedule maintenance** efficiently based on cleanliness status
-- **Monitor panel health** in real-time
-- **Optimize energy production** by maintaining clean panels
+- **Detect dirt accumulation** and specific types (Moss, Bird Droppings) from images.
+- **Estimate Efficiency Loss** based on the detected dirt type.
+- **Trigger Remote Capture** via Raspberry Pi camera modules.
+- **Monitor panel health** across multiple machines using a unified dashboard.
 
 ## 🏗️ Architecture
 
 ```
 solar-image-processing/
-├── src/                    # Core training code
-│   ├── data/              # Dataset handling
-│   ├── train.py           # Enhanced training script
-│   └── evaluate.py        # Model evaluation
-├── pytorch/               # PyTorch model definitions
-│   ├── models/            # Model architectures
-│   └── integration.py     # Backend integration
-├── backend/               # FastAPI application
-│   ├── app/               # API endpoints
-│   └── run.py             # Server entry point
-├── scripts/               # Utility scripts
-│   ├── split_dataset.py   # Dataset splitting
-│   └── train_pipeline.py  # Complete training pipeline
-├── data/                  # Dataset storage
-├── models/                # Trained models
-├── logs/                  # Training logs
-└── docs/                  # Documentation
+├── backend/               # Cloud: PyTorch/DL Backend
+├── backend_edge/          # Edge: SVM/Lite Backend (optimized for Pi)
+├── src/                   # Cloud: DL training scripts
+├── src_edge/              # Edge: Classical ML training (HOG/GLCM)
+├── frontend/              # Unified Next.js Dashboard
+├── scripts/               # Utility and pipeline scripts
+├── data/                  # Shared dataset storage
+└── models/                # Saved model weights
 ```
 
 ## 🚀 Quick Start
 
-### 1. Installation
+### 1. Run with Docker Compose (Recommended)
+
+**Run Edge Stack:**
+```bash
+docker-compose -f docker-compose.edge.yml up --build
+```
+
+**Run Cloud Stack:**
+```bash
+docker-compose -f docker-compose.backend.yml up --build
+```
+
+### 2. Manual Installation
 
 ```bash
 # Clone the repository
