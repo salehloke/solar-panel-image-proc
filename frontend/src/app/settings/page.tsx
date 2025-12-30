@@ -1,12 +1,64 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function Settings() {
     const [confidenceThreshold, setConfidenceThreshold] = useState(0.7);
     const [autoSave, setAutoSave] = useState(true);
     const [notifications, setNotifications] = useState(true);
     const [theme, setTheme] = useState('light');
+    
+    // Model Config State
+    const [currentModel, setCurrentModel] = useState('');
+    const [availableModels, setAvailableModels] = useState<string[]>([]);
+    const [featuresUsed, setFeaturesUsed] = useState<string[]>([]);
+    const [modelLoading, setModelLoading] = useState(false);
+    const [modelMessage, setModelMessage] = useState('');
+
+    useEffect(() => {
+        fetchModelConfig();
+    }, []);
+
+    const fetchModelConfig = async () => {
+        try {
+            const res = await fetch(`${API_URL}/config/model`);
+            if (res.ok) {
+                const data = await res.json();
+                setCurrentModel(data.current_model);
+                setAvailableModels(data.available_models);
+                setFeaturesUsed(data.features_used);
+            }
+        } catch (error) {
+            console.error("Failed to fetch model config:", error);
+        }
+    };
+
+    const handleModelChange = async (newModel: string) => {
+        setModelLoading(true);
+        setModelMessage('');
+        try {
+            const res = await fetch(`${API_URL}/config/model`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model_name: newModel }),
+            });
+            
+            if (res.ok) {
+                setCurrentModel(newModel);
+                setModelMessage(`Successfully switched to ${newModel}`);
+                fetchModelConfig(); // Refresh features used
+            } else {
+                setModelMessage('Failed to switch model');
+            }
+        } catch (error) {
+            console.error("Error switching model:", error);
+            setModelMessage('Error switching model');
+        } finally {
+            setModelLoading(false);
+        }
+    };
 
     return (
         <div className="p-6">
@@ -15,6 +67,53 @@ export default function Settings() {
                     <h1 className="text-3xl font-bold text-gray-900 mb-6">Settings</h1>
 
                     <div className="space-y-8">
+                        
+                        {/* Model Selection (New Section) */}
+                        <div className="border-b border-gray-200 pb-6">
+                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Edge AI Model</h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Active Classification Model
+                                    </label>
+                                    <div className="flex items-center space-x-4">
+                                        <select
+                                            value={currentModel}
+                                            onChange={(e) => handleModelChange(e.target.value)}
+                                            disabled={modelLoading}
+                                            className="block w-full max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                                        >
+                                            {availableModels.map((model) => (
+                                                <option key={model} value={model}>
+                                                    {model}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {modelLoading && <span className="text-sm text-blue-600 animate-pulse">Switching...</span>}
+                                    </div>
+                                    
+                                    {modelMessage && (
+                                        <p className={`text-sm mt-2 ${modelMessage.includes('Success') ? 'text-green-600' : 'text-red-600'}`}>
+                                            {modelMessage}
+                                        </p>
+                                    )}
+
+                                    <div className="mt-3">
+                                        <p className="text-sm text-gray-600">
+                                            Features used by current model: 
+                                            <span className="font-mono ml-2 bg-gray-100 px-2 py-1 rounded">
+                                                {featuresUsed.join(', ')}
+                                            </span>
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            RF = Random Forest (Robust), SVM = Support Vector Machine (Fast).
+                                            GLCM uses texture, HOG uses edges.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Detection Settings */}
                         <div className="border-b border-gray-200 pb-6">
                             <h2 className="text-xl font-semibold text-gray-800 mb-4">Detection Settings</h2>

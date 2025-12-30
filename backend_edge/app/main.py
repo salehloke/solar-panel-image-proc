@@ -23,7 +23,7 @@ from app.database.models import DetectionRecord
 app = FastAPI(
     title="Solar Panel Edge Detection API",
     description="SVM-based dirt classification for Raspberry Pi",
-    version="1.2.0"
+    version="1.3.0"
 )
 
 # CORS middleware
@@ -43,9 +43,78 @@ app.mount("/images", StaticFiles(directory="data/captured"), name="images")
 extractor = FeatureExtractor(target_size=(128, 128))
 camera = CameraService()
 
-# Global variable for the model
-model = None
-MODEL_PATH = os.getenv("MODEL_PATH", "app/models/solar_svm_model.pkl")
+# --- Model Management ---
+class ModelState:
+    def __init__(self):
+        self.model = None
+        self.current_model_name = "solar_svm_model" 
+        self.required_features = ['hog', 'glcm']    
+        self.models_dir = "app/models"
+        self.class_map = {0: "Clean", 1: "Dust", 2: "Bird Droppings", 3: "Moss"}
+        self.benchmarks = {
+            "accuracy": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1_score": 0.0,
+            "proc_time_ms": 0.0
+        }
+    
+    def load_model(self, model_name: str):
+        """Loads a model and determines feature requirements and benchmarks."""
+        path = os.path.join(self.models_dir, f"{model_name}.pkl")
+        metrics_path = os.path.join(self.models_dir, f"{model_name}_metrics.json")
+        
+        if not os.path.exists(path):
+            if not path.endswith('.pkl'): path += '.pkl'
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Model file not found: {path}")
+
+        print(f"🔄 Loading model: {model_name}...")
+        try:
+            self.model = joblib.load(path)
+            self.current_model_name = model_name
+            
+            # Load benchmarks if available
+            if os.path.exists(metrics_path):
+                import json
+                with open(metrics_path, 'r') as f:
+                    self.benchmarks = json.load(f)
+            else:
+                self.benchmarks = {"accuracy": 0, "precision": 0, "recall": 0, "f1_score": 0, "proc_time_ms": 0}
+
+            # Determine features based on naming convention
+            if "_glcm" in model_name:
+                self.required_features = ['glcm']
+            elif "_hog" in model_name:
+                self.required_features = ['hog']
+            else:
+                self.required_features = ['hog', 'glcm']
+                
+            print(f"✅ Model loaded: {model_name} (Accuracy: {self.benchmarks['accuracy']:.2f})")
+            return True
+        except Exception as e:
+            print(f"❌ Error loading model: {e}")
+            return False
+
+    def predict(self, image):
+        """Runs prediction using the loaded model."""
+        if self.model is None:
+            return "Unknown", 0.0
+
+        # Extract only required features
+        features = extractor.extract_features(image, feature_types=self.required_features)
+        features = features.reshape(1, -1)
+        
+        prediction = self.model.predict(features)[0]
+        try:
+            probs = self.model.predict_proba(features)[0]
+            confidence = float(np.max(probs))
+        except:
+            confidence = 1.0 
+            
+        return self.class_map.get(prediction, "Unknown"), confidence
+
+model_state = ModelState()
 
 # Estimated efficiency loss mapping
 EFFICIENCY_LOSS_MAP = {
@@ -57,37 +126,54 @@ EFFICIENCY_LOSS_MAP = {
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize DB and load models on startup."""
+    """Initialize DB and load default model on startup."""
     await init_db()
-    global model
+    default_model = os.getenv("MODEL_NAME", "solar_rf_glcm") 
     try:
-        if os.path.exists(MODEL_PATH):
-            model = joblib.load(MODEL_PATH)
-            print(f"✅ Pre-trained SVM model loaded from {MODEL_PATH}")
-        else:
-            print(f"⚠️ Warning: Model file not found at {MODEL_PATH}")
-    except Exception as e:
-        print(f"❌ Error loading model: {e}")
+        model_state.load_model(default_model)
+    except:
+        print("⚠️ Could not load default model. Waiting for configuration.")
 
-class DetectionResponse(BaseModel):
-    class_name: str
-    confidence: float
-    inference_time: float
-    efficiency_loss: float
-    timestamp: datetime
-    image_url: Optional[str] = None
+# --- Config Schemas ---
+class ModelConfigResponse(BaseModel):
+    current_model: str
+    available_models: List[str]
+    features_used: List[str]
+    benchmarks: Dict[str, float]
 
-class AnalyticsSummary(BaseModel):
-    total_detections: int
-    most_common_type: str
-    avg_efficiency_loss: float
-    class_distribution: List[Dict] # For Bar Chart
-    efficiency_trend: List[Dict]   # For Line Chart
-    recent_history: List[Dict]
+class ModelUpdateRequest(BaseModel):
+    model_name: str
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "model_loaded": model is not None}
+    return {"status": "ok", "model_loaded": model_state.model is not None}
+
+@app.get("/config/model", response_model=ModelConfigResponse)
+async def get_model_config():
+    """Returns current model configuration and available options."""
+    models = []
+    if os.path.exists(model_state.models_dir):
+        models = [f.replace(".pkl", "") for f in os.listdir(model_state.models_dir) if f.endswith(".pkl")]
+    
+    return ModelConfigResponse(
+        current_model=model_state.current_model_name,
+        available_models=sorted(models),
+        features_used=model_state.required_features,
+        benchmarks=model_state.benchmarks
+    )
+
+@app.post("/config/model")
+async def set_model(request: ModelUpdateRequest):
+    """Switches the active model at runtime."""
+    try:
+        success = model_state.load_model(request.model_name)
+        if not success:
+             raise HTTPException(status_code=500, detail="Failed to load model")
+        return {"status": "success", "message": f"Switched to {request.model_name}"}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Model file not found")
+
+# --- Existing Endpoints (Refactored) ---
 
 async def gen_frames():
     """Video streaming generator function."""
@@ -97,7 +183,6 @@ async def gen_frames():
         if not success:
             break
         else:
-            # Lower resolution for smoother streaming on Pi
             frame = cv2.resize(frame, (320, 240))
             ret, buffer = cv2.imencode('.jpg', frame)
             frame = buffer.tobytes()
@@ -107,15 +192,25 @@ async def gen_frames():
 
 @app.get("/stream")
 async def video_stream():
-    """Video streaming route. Put this in the src attribute of an img tag."""
+    """Video streaming route."""
     return StreamingResponse(gen_frames(), media_type='multipart/x-mixed-replace; boundary=frame')
+
+class DetectionResponse(BaseModel):
+    class_name: str
+    confidence: float
+    inference_time: float
+    efficiency_loss: float
+    timestamp: datetime
+    image_url: Optional[str] = None
+    # Benchmarks for the model used
+    model_accuracy: float
+    model_precision: float
+    model_recall: float
+    model_proc_time: float
 
 @app.post("/predict", response_model=DetectionResponse)
 async def detect_dirt(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
-    """
-    Endpoint to receive an image, extract HOG/GLCM features, 
-    predict the dirt type, and log to SQLite.
-    """
+    """Endpoint to receive an image, predict using current model, and log."""
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Invalid file type")
 
@@ -123,7 +218,6 @@ async def detect_dirt(file: UploadFile = File(...), db: AsyncSession = Depends(g
         start_time = time.time()
         contents = await file.read()
         
-        # Save file to captured directory for serving
         filename = f"upload_{int(time.time())}_{file.filename}"
         save_path = os.path.join("data/captured", filename)
         with open(save_path, "wb") as f:
@@ -135,28 +229,12 @@ async def detect_dirt(file: UploadFile = File(...), db: AsyncSession = Depends(g
         if img is None:
             raise ValueError("Could not decode image")
 
-        # 1. Feature Extraction
-        features = extractor.extract_features(img).reshape(1, -1)
-        
-        # 2. Model Inference
-        if model is not None:
-            prediction = model.predict(features)[0]
-            try:
-                probs = model.predict_proba(features)[0]
-                confidence = float(np.max(probs))
-            except:
-                confidence = 1.0
-                
-            class_map = {0: "Clean", 1: "Dust", 2: "Bird Droppings", 3: "Moss"}
-            class_name = class_map.get(prediction, "Unknown")
-        else:
-            class_name = "Clean" # Mock if model missing
-            confidence = 0.5
+        class_name, confidence = model_state.predict(img)
 
         inference_time = round(time.time() - start_time, 4)
         efficiency_loss = EFFICIENCY_LOSS_MAP.get(class_name, 0.0)
         
-        # 3. Log to Database
+        # Log to Database
         record = DetectionRecord(
             class_name=class_name,
             confidence=confidence,
@@ -167,53 +245,56 @@ async def detect_dirt(file: UploadFile = File(...), db: AsyncSession = Depends(g
         await db.commit()
         await db.refresh(record)
         
-        # Add URL to response
-        response_data = DetectionResponse(
+        return DetectionResponse(
             class_name=class_name,
             confidence=confidence,
             inference_time=inference_time,
             efficiency_loss=efficiency_loss,
             timestamp=record.timestamp,
-            image_url=f"/images/{filename}"
+            image_url=f"/images/{filename}",
+            model_accuracy=model_state.benchmarks["accuracy"],
+            model_precision=model_state.benchmarks["precision"],
+            model_recall=model_state.benchmarks["recall"],
+            model_proc_time=model_state.benchmarks["proc_time_ms"]
         )
-        
-        return response_data
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class AnalyticsSummary(BaseModel):
+    total_detections: int
+    most_common_type: str
+    avg_efficiency_loss: float
+    class_distribution: List[Dict] 
+    efficiency_trend: List[Dict]   
+    recent_history: List[Dict]
+
 @app.get("/analytics", response_model=AnalyticsSummary)
 async def get_analytics(db: AsyncSession = Depends(get_db)):
-    """
-    Returns summarized metrics for the dashboard.
-    """
-    # 1. Get total count
+    """Returns summarized metrics for the dashboard."""
     total_q = await db.execute(select(func.count(DetectionRecord.id)))
     total = total_q.scalar()
     
     if total == 0:
         return AnalyticsSummary(
             total_detections=0, most_common_type="None", 
-            avg_efficiency_loss=0.0, recent_history=[]
+            avg_efficiency_loss=0.0, class_distribution=[], 
+            efficiency_trend=[], recent_history=[]
         )
 
-    # 2. Get class distribution
     dist_q = await db.execute(
         select(DetectionRecord.class_name, func.count(DetectionRecord.id))
         .group_by(DetectionRecord.class_name)
     )
     dist = [{"name": r[0], "value": r[1]} for r in dist_q.all()]
 
-    # 3. Get most common type
     mode = "None"
     if dist:
         mode = max(dist, key=lambda x: x["value"])["name"]
 
-    # 4. Get average loss
     avg_loss_q = await db.execute(select(func.avg(DetectionRecord.efficiency_loss)))
     avg_loss = round(avg_loss_q.scalar() or 0.0, 2)
 
-    # 5. Get efficiency trend (Last 10 records)
     trend_q = await db.execute(
         select(DetectionRecord.timestamp, DetectionRecord.efficiency_loss)
         .order_by(DetectionRecord.timestamp.asc())
@@ -221,7 +302,6 @@ async def get_analytics(db: AsyncSession = Depends(get_db)):
     )
     trend = [{"time": r[0].strftime("%H:%M"), "loss": r[1]} for r in trend_q.all()]
 
-    # 6. Get recent history (Last 20 records)
     history_q = await db.execute(
         select(DetectionRecord).order_by(DetectionRecord.timestamp.desc()).limit(20)
     )
@@ -243,38 +323,15 @@ async def get_analytics(db: AsyncSession = Depends(get_db)):
 
 @app.post("/capture", response_model=DetectionResponse)
 async def capture_and_detect(db: AsyncSession = Depends(get_db)):
-    """
-    Triggers the Raspberry Pi camera, captures an image, 
-    and automatically runs detection.
-    """
+    """Triggers camera and runs detection."""
     try:
         start_time = time.time()
-        
-        # 1. Capture image from hardware
         frame, file_path = camera.capture_image()
-        
-        # 2. Extract Features
-        features = extractor.extract_features(frame).reshape(1, -1)
-        
-        # 3. Model Inference
-        if model is not None:
-            prediction = model.predict(features)[0]
-            try:
-                probs = model.predict_proba(features)[0]
-                confidence = float(np.max(probs))
-            except:
-                confidence = 1.0
-                
-            class_map = {0: "Clean", 1: "Dust", 2: "Bird Droppings", 3: "Moss"}
-            class_name = class_map.get(prediction, "Unknown")
-        else:
-            class_name = "Clean"
-            confidence = 0.0
+        class_name, confidence = model_state.predict(frame)
 
         inference_time = round(time.time() - start_time, 4)
         efficiency_loss = EFFICIENCY_LOSS_MAP.get(class_name, 0.0)
         
-        # 4. Log to Database
         record = DetectionRecord(
             class_name=class_name,
             confidence=confidence,
@@ -291,7 +348,11 @@ async def capture_and_detect(db: AsyncSession = Depends(get_db)):
             inference_time=inference_time,
             efficiency_loss=efficiency_loss,
             timestamp=record.timestamp,
-            image_url=f"/images/{os.path.basename(file_path)}"
+            image_url=f"/images/{os.path.basename(file_path)}",
+            model_accuracy=model_state.benchmarks["accuracy"],
+            model_precision=model_state.benchmarks["precision"],
+            model_recall=model_state.benchmarks["recall"],
+            model_proc_time=model_state.benchmarks["proc_time_ms"]
         )
 
     except Exception as e:

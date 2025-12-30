@@ -108,9 +108,22 @@ def train_models(data_dir, output_dir):
         
         print(f"   Accuracy: {acc:.4f} | F1: {f1:.4f} | Proc Time: {avg_proc_time_ms:.4f}ms/img")
         
-        # Save
+        # Save Model
         save_path = Path(output_dir) / f"{config['name']}.pkl"
         joblib.dump(model, save_path)
+        
+        # Save Metrics
+        metrics_data = {
+            'accuracy': float(acc),
+            'precision': float(prec),
+            'recall': float(rec),
+            'f1_score': float(f1),
+            'proc_time_ms': float(avg_proc_time_ms)
+        }
+        metrics_path = Path(output_dir) / f"{config['name']}_metrics.json"
+        with open(metrics_path, 'w') as f:
+            import json
+            json.dump(metrics_data, f, indent=2)
         
         results.append({
             'Model': config['model_type'].upper(),

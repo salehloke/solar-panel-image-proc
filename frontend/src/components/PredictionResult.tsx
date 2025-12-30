@@ -1,14 +1,19 @@
 interface PredictionResultProps {
     prediction: {
         filename?: string;
-        prediction?: string; // Optional to support both backends
-        class_name?: string; // Support for edge backend
+        prediction?: string;
+        class_name?: string;
         confidence: number;
         status?: string;
         efficiency_loss?: number;
         image_url?: string;
         timestamp?: string;
         inference_time?: number;
+        // Model Benchmarks
+        model_accuracy?: number;
+        model_precision?: number;
+        model_recall?: number;
+        model_proc_time?: number;
     };
 }
 
@@ -22,7 +27,6 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const fullImageUrl = prediction.image_url ? `${API_BASE_URL}${prediction.image_url}` : null;
     
-    // Mapping for colors and icons
     const classConfig: Record<string, { bg: string, border: string, text: string, icon: string, desc: string }> = {
         'clean': { 
             bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800', icon: '✅',
@@ -73,7 +77,7 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
                 </div>
             )}
 
-            {/* Efficiency Loss Warning (If applicable) */}
+            {/* Efficiency Loss Warning */}
             {prediction.efficiency_loss !== undefined && prediction.efficiency_loss > 0 && (
                 <div className="bg-red-100 border-l-4 border-red-500 p-4 rounded">
                     <div className="flex items-center">
@@ -89,7 +93,7 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
                 </div>
             )}
 
-            {/* Confidence Score */}
+            {/* Analysis Details & Stability Benchmarks */}
             <div className="bg-gray-50 rounded-lg p-6">
                 <div className="flex justify-between items-center mb-4">
                     <h4 className="text-lg font-semibold text-gray-800">Analysis Details</h4>
@@ -99,10 +103,12 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
                         </span>
                     )}
                 </div>
-                <div className="space-y-4">
+                
+                <div className="space-y-6">
+                    {/* Real-time Confidence */}
                     <div className="space-y-2">
                         <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-600">AI Confidence:</span>
+                            <span className="text-gray-600">AI Confidence (This Image):</span>
                             <span className="font-semibold text-gray-800">{confidencePercentage}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2.5">
@@ -115,23 +121,54 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
                         </div>
                     </div>
 
-                    <div className="flex justify-between text-xs border-t border-gray-100 pt-3">
-                        <span className="text-gray-500">Inference Time:</span>
-                        <span className="font-mono text-gray-700">{prediction.inference_time ? `${(prediction.inference_time * 1000).toFixed(2)}ms` : 'N/A'}</span>
+                    {/* Stability Benchmarks (Model Level) */}
+                    <div className="pt-4 border-t border-gray-200">
+                        <h5 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Model Performance Benchmarks</h5>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white p-3 rounded border border-gray-100 shadow-sm">
+                                <p className="text-xs text-gray-500">Accuracy</p>
+                                <p className="text-lg font-bold text-blue-600">
+                                    {prediction.model_accuracy ? `${(prediction.model_accuracy * 100).toFixed(1)}%` : 'N/A'}
+                                </p>
+                            </div>
+                            <div className="bg-white p-3 rounded border border-gray-100 shadow-sm">
+                                <p className="text-xs text-gray-500">F1 Score</p>
+                                <p className="text-lg font-bold text-purple-600">
+                                    {prediction.model_accuracy ? (prediction.model_accuracy).toFixed(3) : 'N/A'}
+                                </p>
+                            </div>
+                            <div className="bg-white p-3 rounded border border-gray-100 shadow-sm">
+                                <p className="text-xs text-gray-500">Precision</p>
+                                <p className="text-sm font-semibold text-gray-700">
+                                    {prediction.model_precision ? (prediction.model_precision * 100).toFixed(1) + '%' : 'N/A'}
+                                </p>
+                            </div>
+                            <div className="bg-white p-3 rounded border border-gray-100 shadow-sm">
+                                <p className="text-xs text-gray-500">Recall</p>
+                                <p className="text-sm font-semibold text-gray-700">
+                                    {prediction.model_recall ? (prediction.model_recall * 100).toFixed(1) + '%' : 'N/A'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Timing */}
+                    <div className="flex flex-col space-y-2 pt-2">
+                        <div className="flex justify-between text-xs text-gray-500">
+                            <span>Real-time Inference:</span>
+                            <span className="font-mono text-gray-700">
+                                {prediction.inference_time ? `${(prediction.inference_time * 1000).toFixed(2)}ms` : 'N/A'}
+                            </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500">
+                            <span>Benchmark Avg Proc Time:</span>
+                            <span className="font-mono text-gray-700">
+                                {prediction.model_proc_time ? `${prediction.model_proc_time.toFixed(4)}ms` : 'N/A'}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            {/* File Information */}
-            {(prediction.filename || prediction.status) && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-blue-900 mb-2">File Information</h4>
-                    <div className="text-sm text-blue-800">
-                        {prediction.filename && <p><strong>Filename:</strong> {prediction.filename}</p>}
-                        {prediction.status && <p><strong>Status:</strong> {prediction.status}</p>}
-                    </div>
-                </div>
-            )}
 
             {/* Recommendations */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -143,18 +180,16 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
                         <>
                             <p>• Continue regular monitoring to maintain optimal performance</p>
                             <p>• Schedule next inspection in 2-4 weeks</p>
-                            <p>• Monitor energy production for any significant drops</p>
                         </>
                     ) : (
                         <>
-                            <p>• Consider professional cleaning services</p>
                             <p>• Clean with soft brushes and mild soap solution</p>
                             <p>• Avoid abrasive materials that could damage the surface</p>
-                            <p>• Schedule cleaning during early morning or evening hours</p>
                         </>
                     )}
                 </div>
             </div>
         </div>
     );
-} 
+}
+ 
