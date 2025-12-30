@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 import joblib
 import numpy as np
@@ -9,7 +10,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report, accuracy_score, f1_score
+from sklearn.metrics import classification_report, accuracy_score, f1_score, precision_score, recall_score
 from features import EdgeFeatureExtractor
 
 def train_models(data_dir, output_dir):
@@ -83,26 +84,29 @@ def train_models(data_dir, output_dir):
         
         # Initialize Model
         if config['model_type'] == 'svm':
-            # Use Pipeline to scale data automatically before training/prediction
             model = Pipeline([
                 ('scaler', StandardScaler()),
                 ('svc', SVC(kernel='linear', probability=True, random_state=42))
             ])
         else:
-            # Random Forest doesn't strictly need scaling, but it doesn't hurt. 
-            # We'll leave it unscaled to keep it pure, or you can scale it too.
-            # Usually RF handles raw data well.
             model = RandomForestClassifier(n_estimators=100, random_state=42)
             
         # Train
         model.fit(X_train, y_train)
         
-        # Evaluate
+        # Evaluate & Measure Time
+        start_time = time.time()
         y_pred = model.predict(X_test)
-        acc = accuracy_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred, average='weighted')
+        end_time = time.time()
         
-        print(f"   Accuracy: {acc:.4f} | F1: {f1:.4f}")
+        # Metrics
+        avg_proc_time_ms = ((end_time - start_time) / len(X_test)) * 1000
+        acc = accuracy_score(y_test, y_pred)
+        prec = precision_score(y_test, y_pred, average='weighted', zero_division=0)
+        rec = recall_score(y_test, y_pred, average='weighted', zero_division=0)
+        f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
+        
+        print(f"   Accuracy: {acc:.4f} | F1: {f1:.4f} | Proc Time: {avg_proc_time_ms:.4f}ms/img")
         
         # Save
         save_path = Path(output_dir) / f"{config['name']}.pkl"
@@ -112,17 +116,19 @@ def train_models(data_dir, output_dir):
             'Model': config['model_type'].upper(),
             'Features': config['features'].upper(),
             'Accuracy': f"{acc:.4f}",
+            'Precision': f"{prec:.4f}",
+            'Recall': f"{rec:.4f}",
             'F1_Score': f"{f1:.4f}",
-            'Saved_As': config['name'] + ".pkl"
+            'Proc_Time_ms': f"{avg_proc_time_ms:.4f}ms"
         })
 
     # 3. Final Report
-    print("\n" + "="*60)
-    print("📊 COMPARATIVE RESULTS")
-    print("="*60)
+    print("\n" + "="*95)
+    print("📊 COMPARATIVE RESULTS (Raspberry Pi Stability Assessment)")
+    print("="*95)
     df = pd.DataFrame(results)
     print(df.to_string(index=False))
-    print("="*60)
+    print("="*95)
     print(f"💾 All models saved to {output_dir}")
 
 if __name__ == "__main__":
