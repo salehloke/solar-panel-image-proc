@@ -6,6 +6,9 @@ interface PredictionResultProps {
         confidence: number;
         status?: string;
         efficiency_loss?: number;
+        image_url?: string;
+        timestamp?: string;
+        inference_time?: number;
     };
 }
 
@@ -14,6 +17,10 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
     const isClean = label.toLowerCase() === 'clean';
     const confidenceNum = prediction.confidence * 100;
     const confidencePercentage = confidenceNum.toFixed(1);
+    
+    // Base URL for images served by the backend
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const fullImageUrl = prediction.image_url ? `${API_BASE_URL}${prediction.image_url}` : null;
     
     // Mapping for colors and icons
     const classConfig: Record<string, { bg: string, border: string, text: string, icon: string, desc: string }> = {
@@ -52,6 +59,20 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
                 </p>
             </div>
 
+            {/* Captured Image Display */}
+            {fullImageUrl && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                        <span className="text-xs font-bold text-gray-500 uppercase">Captured Evidence</span>
+                    </div>
+                    <img 
+                        src={fullImageUrl} 
+                        alt="Captured solar panel" 
+                        className="w-full h-auto object-cover max-h-64"
+                    />
+                </div>
+            )}
+
             {/* Efficiency Loss Warning (If applicable) */}
             {prediction.efficiency_loss !== undefined && prediction.efficiency_loss > 0 && (
                 <div className="bg-red-100 border-l-4 border-red-500 p-4 rounded">
@@ -70,23 +91,33 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
 
             {/* Confidence Score */}
             <div className="bg-gray-50 rounded-lg p-6">
-                <h4 className="text-lg font-semibold text-gray-800 mb-4">Confidence Score</h4>
-                <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                        <span className="text-gray-600">AI Confidence:</span>
-                        <span className="font-semibold text-gray-800">{confidencePercentage}%</span>
+                <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-lg font-semibold text-gray-800">Analysis Details</h4>
+                    {prediction.timestamp && (
+                        <span className="text-xs text-gray-400">
+                            {new Date(prediction.timestamp).toLocaleTimeString()}
+                        </span>
+                    )}
+                </div>
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-600">AI Confidence:</span>
+                            <span className="font-semibold text-gray-800">{confidencePercentage}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div
+                                className={`h-2.5 rounded-full transition-all duration-500 ${confidenceNum >= 80 ? 'bg-green-500' :
+                                        confidenceNum >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                                    }`}
+                                style={{ width: `${confidencePercentage}%` }}
+                            ></div>
+                        </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                        <div
-                            className={`h-3 rounded-full transition-all duration-500 ${confidenceNum >= 80 ? 'bg-green-500' :
-                                    confidenceNum >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                                }`}
-                            style={{ width: `${confidencePercentage}%` }}
-                        ></div>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                        {confidenceNum >= 80 ? 'High confidence' :
-                            confidenceNum >= 60 ? 'Medium confidence' : 'Low confidence'}
+
+                    <div className="flex justify-between text-xs border-t border-gray-100 pt-3">
+                        <span className="text-gray-500">Inference Time:</span>
+                        <span className="font-mono text-gray-700">{prediction.inference_time ? `${(prediction.inference_time * 1000).toFixed(2)}ms` : 'N/A'}</span>
                     </div>
                 </div>
             </div>

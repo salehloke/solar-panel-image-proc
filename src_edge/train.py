@@ -25,7 +25,10 @@ def train_models(data_dir, output_dir):
             continue
             
         print(f"📦 Processing class: {class_name}")
-        for img_path in class_path.glob("*.jpg"):
+        class_images = list(class_path.glob("*.jpg")) + list(class_path.glob("*.jpeg")) + list(class_path.glob("*.png"))
+        for i, img_path in enumerate(class_images):
+            if i % 20 == 0:
+                print(f"  - Progress: {i}/{len(class_images)}")
             features = extractor.extract(img_path)
             if features is not None:
                 X.append(features)
@@ -41,9 +44,10 @@ def train_models(data_dir, output_dir):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     
     # 1. Train SVM
-    print("🧠 Training SVM...")
-    svm_model = SVC(kernel='linear', probability=True, random_state=42)
+    print("🧠 Training SVM (Support Vector Machine)...")
+    svm_model = SVC(kernel='linear', probability=True, random_state=42, verbose=True)
     svm_model.fit(X_train, y_train)
+    print("✅ SVM Training Complete.")
     y_pred_svm = svm_model.predict(X_test)
     print(f"✅ SVM Accuracy: {accuracy_score(y_test, y_pred_svm):.4f}")
     

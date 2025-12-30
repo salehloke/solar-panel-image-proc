@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import ImageUpload from '@/components/ImageUpload';
 import PredictionResult from '@/components/PredictionResult';
+import LiveFeed from '@/components/LiveFeed';
 
 interface PredictionData {
   filename?: string;
@@ -47,41 +48,45 @@ export default function Home() {
 
         {/* Main Content */}
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* Upload Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-              Upload Image
-            </h2>
-            <ImageUpload
-              onPrediction={handlePrediction}
-              onError={handleError}
-              onLoading={handleLoading}
-            />
+          {/* Left Column: Feed and Upload */}
+          <div className="space-y-8">
+            <LiveFeed />
             
-            <div className="mt-6 pt-6 border-t border-gray-100">
-              <h3 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wider">Edge Controls</h3>
-              <button
-                onClick={async () => {
-                  handleLoading(true);
-                  try {
-                    const res = await fetch('http://localhost:8000/capture', { method: 'POST' });
-                    if (res.ok) handlePrediction(await res.json());
-                    else handleError('Failed to trigger remote camera');
-                  } catch {
-                    handleError('Cannot connect to edge node');
-                  } finally {
-                    handleLoading(false);
-                  }
-                }}
-                className="w-full flex items-center justify-center space-x-2 bg-purple-50 text-purple-700 px-4 py-3 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors"
-              >
-                <span>📸</span>
-                <span className="font-semibold">Remote Pi Capture</span>
-              </button>
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+                Upload Image
+              </h2>
+              <ImageUpload
+                onPrediction={handlePrediction}
+                onError={handleError}
+                onLoading={handleLoading}
+              />
+              
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <h3 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wider">Edge Controls</h3>
+                <button
+                  onClick={async () => {
+                    handleLoading(true);
+                    try {
+                      const res = await fetch('http://localhost:8000/capture', { method: 'POST' });
+                      if (res.ok) handlePrediction(await res.json());
+                      else handleError('Failed to trigger remote camera');
+                    } catch {
+                      handleError('Cannot connect to edge node');
+                    } finally {
+                      handleLoading(false);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 bg-purple-50 text-purple-700 px-4 py-3 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors"
+                >
+                  <span>📸</span>
+                  <span className="font-semibold">Remote Pi Capture</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Results Section */}
+          {/* Right Column: Results */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">
               Detection Results

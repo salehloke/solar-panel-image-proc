@@ -4,9 +4,11 @@ import time
 import joblib
 import cv2
 import numpy as np
-from typing import List, Dict
+from typing import List, Dict, Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -32,6 +34,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Static files for captured images
+os.makedirs("data/captured", exist_ok=True)
+app.mount("/images", StaticFiles(directory="data/captured"), name="images")
 
 # Initialize Services
 extractor = FeatureExtractor(target_size=(128, 128))
@@ -69,6 +75,7 @@ class DetectionResponse(BaseModel):
     inference_time: float
     efficiency_loss: float
     timestamp: datetime
+    image_url: Optional[str] = None
 
 class AnalyticsSummary(BaseModel):
     total_detections: int
@@ -82,6 +89,27 @@ class AnalyticsSummary(BaseModel):
 async def health():
     return {"status": "ok", "model_loaded": model is not None}
 
+async def gen_frames():
+    """Video streaming generator function."""
+    cap = cv2.VideoCapture(0)
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
+        else:
+            # Lower resolution for smoother streaming on Pi
+            frame = cv2.resize(frame, (320, 240))
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    cap.release()
+
+@app.get("/stream")
+async def video_stream():
+    """Video streaming route. Put this in the src attribute of an img tag."""
+    return StreamingResponse(gen_frames(), media_type='multipart/x-mixed-replace; boundary=frame')
+
 @app.post("/predict", response_model=DetectionResponse)
 async def detect_dirt(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     """
@@ -94,6 +122,13 @@ async def detect_dirt(file: UploadFile = File(...), db: AsyncSession = Depends(g
     try:
         start_time = time.time()
         contents = await file.read()
+        
+        # Save file to captured directory for serving
+        filename = f"upload_{int(time.time())}_{file.filename}"
+        save_path = os.path.join("data/captured", filename)
+        with open(save_path, "wb") as f:
+            f.write(contents)
+
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
@@ -132,7 +167,17 @@ async def detect_dirt(file: UploadFile = File(...), db: AsyncSession = Depends(g
         await db.commit()
         await db.refresh(record)
         
-        return record
+        # Add URL to response
+        response_data = DetectionResponse(
+            class_name=class_name,
+            confidence=confidence,
+            inference_time=inference_time,
+            efficiency_loss=efficiency_loss,
+            timestamp=record.timestamp,
+            image_url=f"/images/{filename}"
+        )
+        
+        return response_data
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -240,7 +285,14 @@ async def capture_and_detect(db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(record)
         
-        return record
+        return DetectionResponse(
+            class_name=class_name,
+            confidence=confidence,
+            inference_time=inference_time,
+            efficiency_loss=efficiency_loss,
+            timestamp=record.timestamp,
+            image_url=f"/images/{os.path.basename(file_path)}"
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Camera trigger failed: {str(e)}")

@@ -59,21 +59,23 @@ cd solar-image-processing
 pip install -r requirements.txt
 ```
 
-### 2. Data Preparation
+### 3. Data Preparation
 
 Your dataset should be organized as:
 
 ```
 data/
 ├── train/
-│   ├── clean/     # Clean solar panel images
-│   └── dirty/     # Dirty solar panel images
+│   ├── clean/           # Clean solar panel images
+│   ├── dust/            # Edge: Dust images
+│   ├── bird_droppings/  # Edge: Bird droppings
+│   └── moss/            # Edge: Moss images
 └── test/
-    ├── clean/     # Test clean images
-    └── dirty/     # Test dirty images
+    ├── clean/
+    └── ...
 ```
 
-### 3. Complete Training Pipeline
+### 4. Complete Training Pipeline (Cloud)
 
 Run the complete training pipeline with one command:
 
@@ -89,20 +91,27 @@ This will:
 - ✅ Generate comprehensive reports
 - ✅ Save the best model for deployment
 
-### 4. Start the API
+### 5. Start the API
 
+**Option A: Edge Stack (Lite)**
 ```bash
-# Start the FastAPI server
+docker-compose -f docker-compose.edge.yml up -d
+```
+API available at `http://localhost:8000`
+
+**Option B: Cloud Stack (Deep Learning)**
+```bash
+# Start the FastAPI server locally or via compose
 python backend/run.py
 ```
+API available at `http://localhost:8000`
 
-The API will be available at `http://localhost:8000`
+### 6. Make Predictions
 
-### 5. Make Predictions
+Test the API with an image using `curl`:
 
 ```bash
-# Test the API
-curl -X POST "http://localhost:8000/prediction/" \
+curl -X POST "http://localhost:8000/predict" \
      -H "accept: application/json" \
      -H "Content-Type: multipart/form-data" \
      -F "file=@path/to/your/solar_panel_image.jpg"
@@ -202,6 +211,13 @@ Once the server is running, visit:
   "status": "success"
 }
 ```
+
+## 🧠 Agent Execution History
+
+This project uses an "Agent OS" workflow to track architectural decisions and task execution. You can find the persistent memory of all AI-driven tasks in:
+- `docs/agent-memory/history/`: Completed tasks and bug fixes.
+- `docs/agent-memory/active/`: Currently in-progress tasks.
+- `docs/agent-memory/PROJECT_CONTEXT.md`: High-level architecture and context for AI agents.
 
 ## 📁 Project Structure
 
