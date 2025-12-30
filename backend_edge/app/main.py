@@ -202,6 +202,7 @@ class DetectionResponse(BaseModel):
     efficiency_loss: float
     timestamp: datetime
     image_url: Optional[str] = None
+    model_name: str
     # Benchmarks for the model used
     model_accuracy: float
     model_precision: float
@@ -252,6 +253,7 @@ async def detect_dirt(file: UploadFile = File(...), db: AsyncSession = Depends(g
             efficiency_loss=efficiency_loss,
             timestamp=record.timestamp,
             image_url=f"/images/{filename}",
+            model_name=model_state.current_model_name,
             model_accuracy=model_state.benchmarks["accuracy"],
             model_precision=model_state.benchmarks["precision"],
             model_recall=model_state.benchmarks["recall"],
@@ -349,6 +351,7 @@ async def capture_and_detect(db: AsyncSession = Depends(get_db)):
             efficiency_loss=efficiency_loss,
             timestamp=record.timestamp,
             image_url=f"/images/{os.path.basename(file_path)}",
+            model_name=model_state.current_model_name,
             model_accuracy=model_state.benchmarks["accuracy"],
             model_precision=model_state.benchmarks["precision"],
             model_recall=model_state.benchmarks["recall"],

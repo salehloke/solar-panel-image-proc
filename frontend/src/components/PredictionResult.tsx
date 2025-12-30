@@ -9,6 +9,7 @@ interface PredictionResultProps {
         image_url?: string;
         timestamp?: string;
         inference_time?: number;
+        model_name?: string;
         // Model Benchmarks
         model_accuracy?: number;
         model_precision?: number;
@@ -60,6 +61,10 @@ export default function PredictionResult({ prediction }: PredictionResultProps) 
                 </h3>
                 <p className={`text-lg ${config.text}`}>
                     {config.desc}
+                </p>
+                {/* Show Model Used */}
+                <p className="text-xs text-gray-500 mt-2 uppercase tracking-wide">
+                    Model: {prediction.model_name || 'Unknown'}
                 </p>
             </div>
 

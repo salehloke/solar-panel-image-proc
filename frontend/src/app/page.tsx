@@ -5,6 +5,8 @@ import ImageUpload from '@/components/ImageUpload';
 import PredictionResult from '@/components/PredictionResult';
 import LiveFeed from '@/components/LiveFeed';
 
+import ModelSelector from '@/components/ModelSelector';
+
 interface PredictionData {
   filename?: string;
   prediction?: string;
@@ -36,14 +38,19 @@ export default function Home() {
   return (
     <div className="p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Solar Panel Dirt Detection
-          </h1>
-          <p className="text-xl text-gray-600 mb-8">
-            Upload an image of a solar panel to detect if it&apos;s clean or dirty using AI
-          </p>
+        {/* Header with Model Selector */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-gray-200">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              Solar Panel Dirt Detection
+            </h1>
+            <p className="text-gray-600">
+              Edge AI Monitoring & Stability Assessment
+            </p>
+          </div>
+          <div className="mt-4 md:mt-0">
+            <ModelSelector />
+          </div>
         </div>
 
         {/* Main Content */}
@@ -56,6 +63,7 @@ export default function Home() {
               <h2 className="text-2xl font-semibold text-gray-800 mb-4">
                 Upload Image
               </h2>
+              
               <ImageUpload
                 onPrediction={handlePrediction}
                 onError={handleError}
