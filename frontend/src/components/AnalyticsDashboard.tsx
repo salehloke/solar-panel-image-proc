@@ -23,7 +23,9 @@ export default function AnalyticsDashboard() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('http://localhost:8000/analytics');
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_URL}/analytics`);
+        if (!response.ok) throw new Error('Failed to fetch analytics');
                 if (response.ok) {
                     const result = await response.json();
                     setData(result);

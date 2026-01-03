@@ -6,6 +6,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const menuItems = [
         {
             id: 'home',
@@ -35,7 +36,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             id: 'api',
             label: 'API Docs',
             icon: '📚',
-            href: 'http://localhost:8000/docs',
+            href: `${API_URL}/docs`,
             external: true,
         },
         {

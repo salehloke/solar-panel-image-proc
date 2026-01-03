@@ -75,10 +75,10 @@ export default function Home() {
                 <button
                   onClick={async () => {
                     handleLoading(true);
-                    try {
-                      const res = await fetch('http://localhost:8000/capture', { method: 'POST' });
-                      if (res.ok) handlePrediction(await res.json());
-                      else handleError('Failed to trigger remote camera');
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${API_URL}/capture`, { method: 'POST' });
+      const data = await res.json();
                     } catch {
                       handleError('Cannot connect to edge node');
                     } finally {

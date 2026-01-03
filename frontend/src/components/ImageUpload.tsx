@@ -84,10 +84,10 @@ export default function ImageUpload({ onPrediction, onError, onLoading }: ImageU
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-            const response = await fetch('http://localhost:8000/predict', {
-                method: 'POST',
-                body: formData,
-                signal: controller.signal,
+                  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+                  const response = await fetch(`${API_URL}/predict`, {
+                    method: 'POST',
+                    body: formData,                signal: controller.signal,
             });
 
             clearTimeout(timeoutId);
