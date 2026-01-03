@@ -9,7 +9,7 @@ echo "🚀 Setting up Auto-Start services..."
 
 # 1. Create Backend Service
 echo "📝 Creating Backend Service..."
-sudo bash -c 'cat > /etc/systemd/system/solar-backend.service << EOF
+sudo bash -c "cat > /etc/systemd/system/solar-backend.service << 'EOL'
 [Unit]
 Description=Solar Panel Backend API
 After=network.target
@@ -24,11 +24,11 @@ Environment=PATH=/home/ikmal/Developer/solar-panel-image-proc/backend_edge/venv/
 
 [Install]
 WantedBy=multi-user.target
-EOF'
+EOL"
 
 # 2. Create Frontend Service
 echo "📝 Creating Frontend Service..."
-sudo bash -c 'cat > /etc/systemd/system/solar-frontend.service << EOF
+sudo bash -c "cat > /etc/systemd/system/solar-frontend.service << 'EOL'
 [Unit]
 Description=Solar Panel Dashboard (Frontend)
 After=network.target solar-backend.service
@@ -36,8 +36,6 @@ After=network.target solar-backend.service
 [Service]
 User=ikmal
 WorkingDirectory=/home/ikmal/Developer/solar-panel-image-proc/frontend
-# We use 'npm start' for production, or 'npm run dev' for development.
-# 'npm start' is better for auto-start but requires 'npm run build' first.
 ExecStart=/usr/bin/npm run dev
 Restart=always
 RestartSec=10
@@ -46,7 +44,7 @@ Environment=PORT=3000
 
 [Install]
 WantedBy=multi-user.target
-EOF'
+EOL"
 
 # 3. Reload Systemd and Enable Services
 echo "🔄 Reloading Systemd..."
@@ -57,7 +55,7 @@ sudo systemctl enable solar-backend.service
 sudo systemctl enable solar-frontend.service
 
 echo "▶️ Starting Services NOW..."
-sudo systemctl start solar-backend.service
-sudo systemctl start solar-frontend.service
+sudo systemctl restart solar-backend.service
+sudo systemctl restart solar-frontend.service
 
 echo "🎉 Done! Check status with: sudo systemctl status solar-backend"
