@@ -106,17 +106,34 @@ export default function TrackerLogsTable() {
         manualPagination: true, // Server-side pagination
     });
 
-    const exportToExcel = () => {
-        const ws = XLSX.utils.json_to_sheet(data.map(row => ({
-            Timestamp: new Date(row.timestamp).toLocaleString(),
-            "Defect Type": row.class_name,
-            Confidence: `${(row.confidence * 100).toFixed(1)}%`,
-            "Efficiency Loss": `${row.efficiency_loss}%`,
-            "Processing Time": `${row.inference_time}s`
-        })));
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "TrackerLogs");
-        XLSX.writeFile(wb, `SolarAI_Logs_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const [exporting, setExporting] = useState(false);
+
+    const exportToExcel = async () => {
+        setExporting(true);
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            // Fetch ALL data (large limit)
+            const res = await fetch(`${API_URL}/detections/history?page=1&size=100000`); 
+            if (!res.ok) throw new Error("Failed to fetch export data");
+            
+            const result: HistoryResponse = await res.json();
+            
+            const ws = XLSX.utils.json_to_sheet(result.items.map(row => ({
+                Timestamp: new Date(row.timestamp).toLocaleString(),
+                "Defect Type": row.class_name,
+                Confidence: `${(row.confidence * 100).toFixed(1)}%`,
+                "Efficiency Loss": `${row.efficiency_loss}%`,
+                "Processing Time": `${row.inference_time}s`
+            })));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "TrackerLogs");
+            XLSX.writeFile(wb, `SolarAI_Logs_ALL_${new Date().toISOString().split('T')[0]}.xlsx`);
+        } catch (error) {
+            console.error("Export failed", error);
+            alert("Export failed. Please try again.");
+        } finally {
+            setExporting(false);
+        }
     };
 
     return (
@@ -139,10 +156,11 @@ export default function TrackerLogsTable() {
                     
                     <button 
                         onClick={exportToExcel}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                        disabled={exporting}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                     >
-                        <Download size={16} />
-                        Export
+                        {exporting ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                        {exporting ? 'Exporting...' : 'Export All'}
                     </button>
                 </div>
             </div>
@@ -193,20 +211,40 @@ export default function TrackerLogsTable() {
             </div>
 
             {/* Pagination */}
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-between items-center bg-gray-50">
-                <span className="text-sm text-gray-500">
+            <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">
+                        Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                    </span>
+                    <select
+                        value={table.getState().pagination.pageSize}
+                        onChange={e => {
+                            table.setPageSize(Number(e.target.value));
+                        }}
+                        className="text-sm border-gray-200 rounded p-1 bg-white text-gray-600 focus:ring-blue-500 border"
+                    >
+                        {[10, 20, 50, 100].map(pageSize => (
+                            <option key={pageSize} value={pageSize}>
+                                Show {pageSize}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                
+                <span className="text-sm text-gray-500 hidden sm:block">
                     Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, totalRows)} of {totalRows} entries
                 </span>
+                
                 <div className="flex gap-2">
                     <button
-                        className="p-2 rounded hover:bg-gray-200 disabled:opacity-50"
+                        className="p-2 rounded hover:bg-gray-200 disabled:opacity-50 transition-colors"
                         onClick={() => table.previousPage()}
                         disabled={!table.getCanPreviousPage()}
                     >
                         <ChevronLeft size={16} />
                     </button>
                     <button
-                        className="p-2 rounded hover:bg-gray-200 disabled:opacity-50"
+                        className="p-2 rounded hover:bg-gray-200 disabled:opacity-50 transition-colors"
                         onClick={() => table.nextPage()}
                         disabled={!table.getCanNextPage()}
                     >
