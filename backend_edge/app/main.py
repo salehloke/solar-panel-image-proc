@@ -329,6 +329,67 @@ async def get_analytics(db: AsyncSession = Depends(get_db)):
         recent_history=formatted_history
     )
 
+class HistoryResponse(BaseModel):
+    items: List[DetectionResponse]
+    total: int
+    page: int
+    size: int
+
+@app.get("/detections/history", response_model=HistoryResponse)
+async def get_history(
+    page: int = 1,
+    size: int = 20,
+    class_name: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Returns paginated detection history with optional filtering."""
+    offset = (page - 1) * size
+    
+    # Build query
+    query = select(DetectionRecord)
+    count_query = select(func.count(DetectionRecord.id))
+    
+    if class_name:
+        query = query.where(DetectionRecord.class_name == class_name)
+        count_query = count_query.where(DetectionRecord.class_name == class_name)
+    
+    # Get total count
+    total = (await db.execute(count_query)).scalar() or 0
+    
+    # Get items
+    query = query.order_by(DetectionRecord.timestamp.desc()).offset(offset).limit(size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    
+    # Map to response model
+    mapped_items = []
+    for item in items:
+        # Construct image URL if we assume file naming convention or if we stored it
+        # Since DB schema currently doesn't have filename, we might need migration 
+        # For now, we return null or generic URL if not stored.
+        # Ideally, we should update DB to store filename. 
+        # Assuming for now we just return the data we have.
+        mapped_items.append(DetectionResponse(
+            class_name=item.class_name,
+            confidence=item.confidence,
+            inference_time=item.inference_time,
+            efficiency_loss=item.efficiency_loss,
+            timestamp=item.timestamp,
+            image_url=None, # We need to update DB to store this for history
+            model_name="Unknown", # Not stored in historical records yet
+            model_accuracy=0.0,
+            model_precision=0.0,
+            model_recall=0.0,
+            model_proc_time=0.0
+        ))
+
+    return HistoryResponse(
+        items=mapped_items,
+        total=total,
+        page=page,
+        size=size
+    )
+
 @app.post("/capture", response_model=DetectionResponse)
 async def capture_and_detect(db: AsyncSession = Depends(get_db)):
     """Triggers camera and runs detection."""
