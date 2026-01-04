@@ -5,12 +5,13 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     LineChart, Line, Legend
 } from 'recharts';
-import { Activity, AlertTriangle, BarChart3, TrendingDown } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, TrendingDown, Clock } from 'lucide-react';
 
 interface AnalyticsData {
     total_detections: number;
     most_common_type: string;
     avg_efficiency_loss: number;
+    avg_inference_time: number;
     class_distribution: Array<{ name: string, value: number }>;
     efficiency_trend: Array<{ time: string, loss: number }>;
     recent_history: Array<{ timestamp: string, class: string, loss: number }>;
@@ -45,7 +46,7 @@ export default function AnalyticsDashboard() {
     return (
         <div className="space-y-8">
             {/* Top Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
                     <div className="bg-blue-100 p-3 rounded-lg text-blue-600">
                         <Activity size={24} />
@@ -73,6 +74,20 @@ export default function AnalyticsDashboard() {
                     <div>
                         <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">Avg. Efficiency Loss</p>
                         <p className="text-2xl font-bold text-gray-900">{data.avg_efficiency_loss}%</p>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                    <div className="bg-purple-100 p-3 rounded-lg text-purple-600">
+                        <Clock size={24} />
+                    </div>
+                    <div>
+                        <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">Avg. Processing Time</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                            {data.avg_inference_time < 1 
+                                ? `${(data.avg_inference_time * 1000).toFixed(0)}ms` 
+                                : `${data.avg_inference_time.toFixed(2)}s`}
+                        </p>
                     </div>
                 </div>
             </div>

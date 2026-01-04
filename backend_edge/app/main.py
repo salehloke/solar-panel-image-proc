@@ -267,6 +267,7 @@ class AnalyticsSummary(BaseModel):
     total_detections: int
     most_common_type: str
     avg_efficiency_loss: float
+    avg_inference_time: float
     class_distribution: List[Dict] 
     efficiency_trend: List[Dict]   
     recent_history: List[Dict]
@@ -280,7 +281,8 @@ async def get_analytics(db: AsyncSession = Depends(get_db)):
     if total == 0:
         return AnalyticsSummary(
             total_detections=0, most_common_type="None", 
-            avg_efficiency_loss=0.0, class_distribution=[], 
+            avg_efficiency_loss=0.0, avg_inference_time=0.0,
+            class_distribution=[], 
             efficiency_trend=[], recent_history=[]
         )
 
@@ -296,6 +298,9 @@ async def get_analytics(db: AsyncSession = Depends(get_db)):
 
     avg_loss_q = await db.execute(select(func.avg(DetectionRecord.efficiency_loss)))
     avg_loss = round(avg_loss_q.scalar() or 0.0, 2)
+
+    avg_time_q = await db.execute(select(func.avg(DetectionRecord.inference_time)))
+    avg_time = round(avg_time_q.scalar() or 0.0, 4)
 
     trend_q = await db.execute(
         select(DetectionRecord.timestamp, DetectionRecord.efficiency_loss)
@@ -318,6 +323,7 @@ async def get_analytics(db: AsyncSession = Depends(get_db)):
         total_detections=total,
         most_common_type=mode,
         avg_efficiency_loss=avg_loss,
+        avg_inference_time=avg_time,
         class_distribution=dist,
         efficiency_trend=trend,
         recent_history=formatted_history
